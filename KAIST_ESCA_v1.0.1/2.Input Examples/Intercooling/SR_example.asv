@@ -1,0 +1,251 @@
+close all
+clear
+% clc
+
+addpath(genpath('D:\Dropbox\MATLAB\Now_Working\Steady\KAIST_ACOD_release_v1\KAIST_CCD_Seongmin'))
+
+% Generalized CCD - 20170619 ~
+% Single IHX cases
+% Cooler / TIT : T bounded
+% Main compressor : P bounded
+
+SR_condition
+SR_layout
+SR_machine_property
+
+% System Boundary Condition
+Condition.delt = 1e-6;
+
+Condition.T_bound.ID = [4, 1];
+Condition.T_bound.value = [32 + 273.15, 600 + 273.15];
+Condition.P_bound.ID = 5;
+Condition.P_bound.value = 25000;
+
+iParameters.name = {'Mechanics.Turbine(1).P_ratio', 'Condition.split(1)'};
+iParameters.value = [2.0, 0.5];
+iParameters.max = [3.0, 0.8];
+iParameters.min = [1.5, 0.4];
+% iParameters.criteria = [2, 0.5];
+
+% iParameters.value = [2.2, 0.9, 0.84, 0.84];
+
+mu_0 = 0.1; % damping factor
+
+tic()
+
+[Junc, info] = Steady_Solver(Condition, Component, Mechanics);
+Output_Result_info(Condition, Junc, Component, info.m_flow_rate, info.Net_work)
+
+AAAA = toc();
+
+tic()
+
+[P, Junc, info] = Cycle_Optimizer(Condition, Component, Mechanics, iParameters, mu_0);
+
+toc()
+
+
+
+% 
+% Parameters = iParameters.name;
+% 
+% Parameters_now = iParameters.value;
+% 
+% Parameters_min = iParameters.min;
+% 
+% Parameters_max = iParameters.max;
+% 
+% % Parameters_criteria = iParameters.criteria;
+% 
+% % Initialization
+% 
+% 
+% old_Parameters = Parameters_now;
+% old_g = -1;
+% dg = -1;
+% mu = mu_0;
+% oldg00 = -1;
+% 
+% jjj = 0;
+% jjjj = 0;
+% kkk = 0;
+% 
+% % while(1)
+% for kk=1:1
+%     jjj = jjj+1;
+%     
+%     for i=1:size(Parameters, 2)
+%         eval([Parameters{i}, ' = ', num2str(Parameters_now(i)), ';'])
+%     end
+%     
+%     [Junc, info] = Steady_Solver(Condition, Component, Mechanics);
+%     
+%     %     Output_Result_info(Condition, Junc, Component, info.m_flow_rate, info.Net_work)
+%     
+%     Eff = info.Net_work / Condition.Q_in;
+%     
+%     PARA(jjj, :) = Parameters_now;
+%     EFFF(jjj) = Eff;
+%     
+%     g0 = get_g(Condition, Junc, Component);
+%     
+%     if(g0 > old_g + dg)
+%         
+%         str = [];
+%         for i=1:size(Parameters, 2)
+%             str = [str, num2str(Parameters_now(i)), '     '];
+%         end
+%         
+%         jjjj = jjjj+1;
+%         
+%         disp(' ')
+%         disp('//////////////////////////////////////////////////////////////////////')
+%         disp(['Try # : ', num2str(jjjj)])
+%         disp(' ')
+%         disp(['Design Parameters : ', str])
+%         
+%         % Set reference
+%         
+%         disp('Calculating start...')
+%         
+%         kkk = kkk+1;
+%         P(kkk, :) = [Parameters_now, Eff, 1];
+%         
+%         mu = mu/2;
+%         % mu = mu_0;
+%         
+%         disp(' ')
+%         disp('Adjoint Sensitivity / Hessian analysis start...')
+%         disp(' ')
+%         
+%         [ Jacobian, Hessian ] = Adjoint_Solver(iParameters, Junc, Component, Mechanics, Condition);
+%         
+%         
+%         % Levenberg - Marquardt Method
+%         
+%         STEPS = -1 * transpose( (Hessian + mu * diag(diag(Hessian))) \ transpose(Jacobian));
+%         
+%        
+%         old_Parameters = Parameters_now;
+%         
+%         Parameters_backup = Parameters_now;
+%         
+%         Parameters_now = Parameters_now + STEPS;
+%         
+%         for i=1:size(Parameters, 2)
+%             if(Parameters_now(i) > Parameters_max(i))
+%                 Parameters_now(i) = Parameters_max(i);
+%             elseif(Parameters_now(i) < Parameters_min(i))
+%                 Parameters_now(i) = Parameters_min(i);
+%             end
+%         end
+%         
+%         STEPS = Parameters_now - old_Parameters;
+%         
+%         dg = (0.3 * STEPS * transpose(Jacobian));
+%         
+%         if(dg<0)
+%             STEPS = -STEPS;
+%         end
+%         
+% %         Parameters_now = Parameters_backup + STEPS;
+%         
+%         old_g = g0;
+%         
+%         dg = abs(dg);
+%         
+%         str = [];
+%         for i=1:size(Parameters, 2)
+%             str = [str, num2str(STEPS(i)), '     '];
+%         end
+%         
+%         disp(['Calculated Steps : ', str])
+%         
+%         disp(' ')
+%         disp(['Cycle Net Work (MW) = ', num2str(info.Net_work / 1e6)]);
+%         disp(['Cycle Efficiency (%) = ', num2str(info.Net_work / Condition.Q_in)]);
+%         
+%     else
+%         
+%         Parameters_now = old_Parameters;
+%         
+%         kkk = kkk+1;
+%         P(kkk, :) = [Parameters_now, Eff, -1];
+%         
+%         mu = mu*4;
+%         
+%         disp(' ')
+%         disp('Re calculation with previous Jacobian/Hessian...')
+%         
+%         % Levenberg?Marquardt Method
+%         
+%         STEPS = -1 * transpose( (Hessian + mu * diag(diag(Hessian))) \ transpose(Jacobian));
+%                
+%         Parameters_backup = Parameters_now;
+%         
+%         Parameters_now = Parameters_now + STEPS;
+%         
+%         for i=1:size(Parameters, 2)
+%             if(Parameters_now(i) > Parameters_max(i))
+%                 Parameters_now(i) = Parameters_max(i);
+%             elseif(Parameters_now(i) < Parameters_min(i))
+%                 Parameters_now(i) = Parameters_min(i);
+%             end
+%         end
+%         
+%         STEPS = Parameters_now - old_Parameters;
+%         
+%         dg = (0.3 * STEPS * transpose(Jacobian));
+%         
+%         if(dg<0)
+%             STEPS = -STEPS;
+%         end
+%         
+%         dg = abs(dg);
+%         
+% %         Parameters_now = Parameters_backup + STEPS;
+%         
+%         str = [];
+%         for i=1:size(Parameters, 2)
+%             str = [str, num2str(STEPS(i)), '     '];
+%         end
+%         
+%         disp(['Calculated Steps : ', str])
+%         
+%         disp(['Expected dg : ', num2str(dg), '      mu : ', num2str(mu)])
+%         
+%     end
+%     
+%     if(dg / g0 < Condition.Error_bound)
+%         break;
+%     end
+% %     if(max(abs(STEPS)) < Condition.Error_bound)
+% %         break;
+% %     end
+%     
+% end
+% 
+% 
+% for i=1:size(Parameters, 2)
+%     eval([Parameters{i}, ' = ', num2str(Parameters_now(i)), ';'])
+% end
+% 
+% str = [];
+% for i=1:size(Parameters, 2)
+%     str = [str, num2str(Parameters_now(i)), '     '];
+% end
+% 
+% 
+% disp(' ')
+% disp('//////////////////////////////////////////////////////////////////////')
+% disp(' ')
+% disp(['Design Parameters : ', str])
+% 
+% 
+% % Set reference
+% 
+% disp('Calculating start...')
+% 
+% [Junc, info] = Steady_Solver(Condition, Component, Mechanics);
+% 
+% Output_Result_info(Condition, Junc, Component, info.m_flow_rate, info.Net_work)
